@@ -1,0 +1,5 @@
+name: Drupal Summer
+type: module
+description: Drupal Summer example module
+core: 8.x
+package: Custom

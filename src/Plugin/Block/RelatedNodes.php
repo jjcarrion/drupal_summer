@@ -7,6 +7,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Session\AccountProxy;
 use Drupal\node\Entity\Node;
+use Drupal\user\Entity\User;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Routing\CurrentRouteMatch;
 use Drupal\Core\Entity\EntityTypeManager;
@@ -69,14 +70,14 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
    *   The plugin implementation definition.
    */
   public function __construct(
-        array $configuration,
-        $plugin_id,
-        $plugin_definition,
-        CurrentRouteMatch $current_route_match, 
-	      EntityTypeManager $entity_type_manager,
-	      QueryFactory $entity_query,
-	      Renderer $renderer,
-        AccountProxy $current_user
+    array $configuration,
+    $plugin_id,
+    $plugin_definition,
+    CurrentRouteMatch $current_route_match,
+    EntityTypeManager $entity_type_manager,
+    QueryFactory $entity_query,
+    Renderer $renderer,
+    AccountProxy $current_user
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->current_route_match = $current_route_match;
@@ -133,31 +134,36 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
     // Without dependency injection:
     // $node = \Drupal::routeMatch()->getParameter('node');
     if (!$node) {
-      return [];
+      $build['no_products'] = [
+        '#type' => 'html_tag',
+        '#tag' => 'p',
+        '#value' => 'There are no products to relate.',
+        '#cache' => [
+          'keys' => ['summer_user'],
+          'contexts' => [
+            'url.path',
+          ],
+        ],
+      ];
+      return $build;
     }
 
     $build = [];
-    $build['user'] = [
-      '#type' => 'html_tag',
-      '#tag' => 'p',
-      '#value' => 'Hello %username!', ['%username' => $this->current_user->getDisplayName()]
-    ];
 
     $taxonomy_from_current_node = $node->field_tags->entity->getName();
     $related_node_ids = $this->getRelatedNodes($taxonomy_from_current_node);
 
     $related_nodes = Node::loadMultiple($related_node_ids);
 
-    $nodes = [];
-    foreach ($related_nodes as $related_node) {
+    foreach ($related_nodes as $key => $related_node) {
       // Render as view modes.
-      $nodes[] = [
-        $this->entity_type_manager
-          ->getViewBuilder('node')
-          ->view($related_node, 'teaser'),
-      ];
+      $build[$key] = $this->entity_type_manager
+        ->getViewBuilder('node')
+        ->view($related_node, 'teaser');
+      $build[$key]['#cache']['contexts'][] = 'url';
     }
-    $build['related_products'] = $nodes;
+    //    $user = User::load($this->current_user->id());
+    //    $this->renderer->addCacheableDependency($build['user'], $user);
     return $build;
   }
 

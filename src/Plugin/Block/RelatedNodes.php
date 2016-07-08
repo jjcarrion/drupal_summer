@@ -163,6 +163,8 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
    * #lazy_builder callback.
    */
   static public function lazy_builder() {
+    // Simulate that we have a very "expensive" call to show how big pipe works.
+    sleep(4);
     $node = \Drupal::routeMatch()->getParameter('node');
     $taxonomy_from_current_node = $node->field_tags->entity->getName();
 

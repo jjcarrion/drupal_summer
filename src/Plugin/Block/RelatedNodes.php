@@ -5,6 +5,8 @@ namespace Drupal\drupal_summer\Plugin\Block;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Session\AccountProxy;
+use Drupal\node\Entity\Node;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Core\Routing\CurrentRouteMatch;
 use Drupal\Core\Entity\EntityTypeManager;
@@ -48,6 +50,14 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
    * @var \Drupal\Core\Render\Renderer
    */
   protected $renderer;
+
+  /**
+   * Drupal\Core\Session\AccountProxy definition.
+   *
+   * @var \Drupal\Core\Session\AccountProxy
+   */
+  protected $current_user;
+
   /**
    * Construct.
    *
@@ -65,13 +75,15 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
         CurrentRouteMatch $current_route_match, 
 	      EntityTypeManager $entity_type_manager,
 	      QueryFactory $entity_query,
-	      Renderer $renderer
+	      Renderer $renderer,
+        AccountProxy $current_user
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->current_route_match = $current_route_match;
     $this->entity_type_manager = $entity_type_manager;
     $this->entity_query = $entity_query;
     $this->renderer = $renderer;
+    $this->current_user = $current_user;
   }
 
   /**
@@ -85,7 +97,8 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
       $container->get('current_route_match'),
       $container->get('entity_type.manager'),
       $container->get('entity.query'),
-      $container->get('renderer')
+      $container->get('renderer'),
+      $container->get('current_user')
     );
   }
 
@@ -116,10 +129,44 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
    * {@inheritdoc}
    */
   public function build() {
-    $build = [];
-    $build['related_nodes_number_of_nodes']['#markup'] = '<p>' . $this->configuration['number_of_nodes'] . '</p>';
+    $node = $this->current_route_match->getParameter('node');
+    // Without dependency injection:
+    // $node = \Drupal::routeMatch()->getParameter('node');
+    if (!$node) {
+      return [];
+    }
 
+    $build = [];
+    $build['user'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'p',
+      '#value' => 'Hello %username!', ['%username' => $this->current_user->getDisplayName()]
+    ];
+
+    $taxonomy_from_current_node = $node->field_tags->entity->getName();
+    $related_node_ids = $this->getRelatedNodes($taxonomy_from_current_node);
+
+    $related_nodes = Node::loadMultiple($related_node_ids);
+
+    $nodes = [];
+    foreach ($related_nodes as $related_node) {
+      // Render as view modes.
+      $nodes[] = [
+        $this->entity_type_manager
+          ->getViewBuilder('node')
+          ->view($related_node, 'teaser'),
+      ];
+    }
+    $build['related_products'] = $nodes;
     return $build;
+  }
+
+  private function getRelatedNodes($taxonomy_from_current_node) {
+    $query = $this->entity_query->get('node');
+    $query->condition('field_tags.entity.name', $taxonomy_from_current_node, '=');
+    $query->range(0, $this->configuration['number_of_nodes']);
+    $ids = $query->execute();
+    return $ids;
   }
 
 }

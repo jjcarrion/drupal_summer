@@ -148,31 +148,38 @@ class RelatedNodes extends BlockBase implements ContainerFactoryPluginInterface 
       return $build;
     }
 
-    $build = [];
+    $build = [
+      '#lazy_builder' => [
+        '\Drupal\drupal_summer\Plugin\Block\RelatedNodes::lazy_builder',
+        [],
+      ],
+      '#create_placeholder' => TRUE,
+    ];
 
+    return $build;
+  }
+
+  /**
+   * #lazy_builder callback.
+   */
+  static public function lazy_builder() {
+    $node = \Drupal::routeMatch()->getParameter('node');
     $taxonomy_from_current_node = $node->field_tags->entity->getName();
-    $related_node_ids = $this->getRelatedNodes($taxonomy_from_current_node);
+
+    $query = \Drupal::entityQuery('node');
+    $query->condition('field_tags.entity.name', $taxonomy_from_current_node, '=');
+    $query->range(0, 2);
+    $related_node_ids = $query->execute();
 
     $related_nodes = Node::loadMultiple($related_node_ids);
-
+    $build = [];
     foreach ($related_nodes as $key => $related_node) {
       // Render as view modes.
-      $build[$key] = $this->entity_type_manager
+      $build[$key] = \Drupal::entityTypeManager()
         ->getViewBuilder('node')
         ->view($related_node, 'teaser');
       $build[$key]['#cache']['contexts'][] = 'url';
     }
-    //    $user = User::load($this->current_user->id());
-    //    $this->renderer->addCacheableDependency($build['user'], $user);
     return $build;
   }
-
-  private function getRelatedNodes($taxonomy_from_current_node) {
-    $query = $this->entity_query->get('node');
-    $query->condition('field_tags.entity.name', $taxonomy_from_current_node, '=');
-    $query->range(0, $this->configuration['number_of_nodes']);
-    $ids = $query->execute();
-    return $ids;
-  }
-
 }

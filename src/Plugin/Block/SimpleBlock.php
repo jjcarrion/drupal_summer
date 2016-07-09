@@ -27,7 +27,6 @@ class SimpleBlock extends BlockBase {
         'keys' => ['summer_user'],
         'contexts' => [
           'user',
-          'url.path',
         ],
       ],
     ];

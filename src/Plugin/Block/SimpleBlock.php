@@ -20,7 +20,11 @@ class SimpleBlock extends BlockBase {
    */
   public function build() {
     $build = [];
-    $build['simple_block']['#markup'] = 'Implement My Block.';
+    $build['user'] = [
+      '#type' => 'html_tag',
+      '#tag' => 'p',
+      '#value' => 'Hello ' . \Drupal::currentUser()->getDisplayName(),
+    ];
 
     return $build;
   }
